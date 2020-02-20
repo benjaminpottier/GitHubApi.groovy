@@ -13,18 +13,9 @@ import groovyx.net.http.*
 
 @Grab(group='org.codehaus.groovy.modules.http-builder', module='http-builder', version='0.7.1')
 
-// Uncomment to turn on logging
-/*
-@GrabConfig(systemClassLoader=true) 
-@Grab(group='log4j', module='log4j', version='1.2.17') 
-import groovy.util.logging.Log4j 
-*/
-
 class GitHubApi {
 
-  // Fetch GitHub token from ~/.github.token
-  static final String token = new File("${System.getProperty('user.home')}/.github.token").text.trim()
-
+  static String token
   def rateLimit = null
 
   def secondsToReset() {
@@ -50,12 +41,6 @@ class GitHubApi {
 
   // Initialize a new API instance
   static final def github = new RESTClient( 'https://api.github.com' ).with {
-    client.addRequestInterceptor(
-      [process: { HttpRequest request, HttpContext context ->
-          // Using httpbuilders auth mechanism doesn't work, do it manually
-          request.setHeader("Authorization", "token $token")
-      }] as HttpRequestInterceptor
-    )
     // Allow up to 5s for responses
     client.params.setIntParameter('http.connection.timeout', 5000)
     client.params.setIntParameter('http.socket.timeout', 5000)
@@ -66,7 +51,7 @@ class GitHubApi {
   def getNext(response) {
     def next = null
     for (link in response.getHeaders('Link')?.value[0]?.split(',')) {
-      def matcher = link =~ /<(.*)\?page=(\d+)>; rel="next"/
+      def matcher = link.replaceAll("\\s", "") =~ /<(.*)\?page=(\d+)>;rel="next"/
       if (matcher.matches()) {
         next = [url:matcher[0][1], page:matcher[0][2]]
       }
@@ -83,7 +68,7 @@ class GitHubApi {
         print "${secondsToReset()}".padRight(10) + "\r"
         sleep(5000)
         def resp = github.get(path: '/rate_limit', 
-          requestContentType:ContentType.URLENC, headers:['User-Agent':'Groovy'])
+          requestContentType:ContentType.URLENC, headers:['User-Agent':'Groovy','Authorization':"token ${this.token}"])
         updateRateLimit(resp)
       }
       println ""
@@ -94,12 +79,12 @@ class GitHubApi {
   def get(path, query=null) {
     checkRateLimit()
     def resp = github.get(path: path, query:query,
-      requestContentType:ContentType.URLENC, headers:['User-Agent':'Groovy'])
+      requestContentType:ContentType.URLENC, headers:['User-Agent':'Groovy','Authorization':"token ${this.token}"])
     updateRateLimit(resp)
     def data = resp.data
     def next = getNext(resp)
     while (next) {
-      resp = github.get(path: next.url, query:[page: next.page], headers:['User-Agent':'Groovy'])
+      resp = github.get(path: next.url, query:[page: next.page], headers:['User-Agent':'Groovy','Authorization':"token ${this.token}"])
       data += resp.data
       next = getNext(resp)
     }
@@ -110,7 +95,7 @@ class GitHubApi {
   def put(path, body) {
     checkRateLimit()
     def resp = github.put(path: path, body: body,
-      requestContentType:ContentType.URLENC, headers:['User-Agent':'Groovy'])
+      requestContentType:ContentType.URLENC, headers:['User-Agent':'Groovy','Authorization':"token ${this.token}"])
     updateRateLimit(resp)
   }
 
@@ -118,7 +103,7 @@ class GitHubApi {
   def patch(path, body) {
     checkRateLimit()
     def resp = github.patch(path: path, body: body, 
-      requestContentType:ContentType.URLENC, headers:['User-Agent':'Groovy'])
+      requestContentType:ContentType.URLENC, headers:['User-Agent':'Groovy','Authorization':"token ${this.token}"])
     updateRateLimit(resp)
   }
 
