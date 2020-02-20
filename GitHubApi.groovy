@@ -1,11 +1,3 @@
-#!/usr/bin/env groovy
-
-/*
- * GitHuB API for Groovy (respects rate limits)
- *
- * Expects to find your GitHub token in ~/.github.token
- */
-
 import groovyx.net.http.RESTClient
 import org.apache.http.*
 import org.apache.http.protocol.*
